@@ -52,13 +52,13 @@ import GI.Value
 data Name = Name { namespace :: String, name :: String }
     deriving (Eq, Ord, Show)
 
-getName :: BaseInfoClass bi => bi -> Name
-getName bi =
-   let namespace = baseInfoNamespace $ baseInfo bi
-       name = baseInfoName $ baseInfo bi
+getName :: InfoClass info => info -> Name
+getName i =
+   let namespace = infoNamespace i
+       name = infoName i
     in Name namespace name
 
-withName :: BaseInfoClass bi => (bi -> a) -> (bi -> (Name, a))
+withName :: InfoClass info => (info -> a) -> (info -> (Name, a))
 withName f x = (getName x, f x)
 
 data Constant = Constant {
@@ -81,7 +81,7 @@ data Enumeration = Enumeration {
 
 toEnumeration :: EnumInfo -> Enumeration
 toEnumeration ei = Enumeration
-    (map (\vi -> (baseInfoName . baseInfo $ vi, valueInfoValue vi))
+    (map (\vi -> (infoName vi, valueInfoValue vi))
              (enumInfoValues ei))
     (enumInfoErrorDomain ei)
     (registeredTypeInfoTypeInit ei)
@@ -107,14 +107,14 @@ data Arg = Arg {
 
 toArg :: ArgInfo -> Arg
 toArg ai =
-   Arg (baseInfoName . baseInfo $ ai)
-        (typeFromTypeInfo . argInfoType $ ai)
-        (argInfoDirection ai)
-        (argInfoMayBeNull ai)
-        (argInfoScope ai)
-        (argInfoClosure ai)
-        (argInfoDestroy ai)
-        (argInfoOwnershipTransfer ai)
+   Arg (infoName ai)
+       (typeFromTypeInfo . argInfoType $ ai)
+       (argInfoDirection ai)
+       (argInfoMayBeNull ai)
+       (argInfoScope ai)
+       (argInfoClosure ai)
+       (argInfoDestroy ai)
+       (argInfoOwnershipTransfer ai)
 
 data Callable = Callable {
     returnType :: Type,
@@ -158,7 +158,7 @@ data Signal = Signal {
 
 toSignal :: SignalInfo -> Signal
 toSignal si = Signal {
-    sigName = baseInfoName $ baseInfo si,
+    sigName = infoName si,
     sigCallable = toCallable $ callableInfo si }
 
 data Property = Property {
@@ -170,7 +170,7 @@ data Property = Property {
 
 toProperty :: PropertyInfo -> Property
 toProperty pi =
-    Property (baseInfoName $ baseInfo pi)
+    Property (infoName pi)
         (typeFromTypeInfo $ propertyInfoType pi)
         (propertyInfoFlags pi)
         (propertyInfoTransfer pi)
@@ -185,19 +185,19 @@ data Field = Field {
 
 toField :: FieldInfo -> Field
 toField fi =
-    Field {fieldName = baseInfoName . baseInfo $ fi,
+    Field {fieldName = infoName fi,
            fieldType = typeFromTypeInfo $ fieldInfoType fi,
            fieldOffset = fieldInfoOffset fi,
            -- Fields with embedded "anonymous" callback interfaces.
            fieldCallback =
                case typeFromTypeInfo (fieldInfoType fi) of
                  TInterface _ n ->
-                     if n /= (baseInfoName . baseInfo $ fi)
+                     if n /= infoName fi
                      then Nothing
                      else let iface = baseInfo .
                                       typeInfoInterface .
                                       fieldInfoType $ fi
-                          in case baseInfoType iface of
+                          in case infoType iface of
                                InfoTypeCallback ->
                                    Just . toCallback . fromBaseInfo $ iface
                                _ -> Nothing
@@ -321,11 +321,9 @@ data API
     | APIBoxed Boxed
     deriving Show
 
-toAPI :: BaseInfoClass bi => bi -> (Name, API)
-toAPI i = (getName bi, toAPI' (baseInfoType i) bi)
+toAPI :: BaseInfo -> (Name, API)
+toAPI bi = (getName bi, toAPI' (infoType bi) bi)
     where
-
-    bi = baseInfo i
 
     toAPI' InfoTypeConstant = convert APIConst toConstant
     toAPI' InfoTypeEnum = convert APIEnum toEnumeration
